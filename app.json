@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "15c04e60-5c12-4cbe-aa7e-a409ec8458a0"
       }
     },
     "splash": {
@@ -17,7 +17,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": ["expo-notifications"],
+    "plugins": [
+      "expo-notifications"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -29,6 +31,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "owner": "ferxas"
   }
 }

@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Button, BackHandler } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,7 +12,10 @@ import {
   setDoc,
   doc,
   Timestamp,
+  getDoc,
+  onSnapshot,
 } from 'firebase/firestore';
+import Constants from 'expo-constants';
 import { db } from './firebaseConfig';
 
 import RoomListScreen from './screens/RoomListScreen';
@@ -26,7 +30,7 @@ const Tab = createBottomTabNavigator();
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
@@ -63,59 +67,21 @@ function DashboardStack() {
       <Stack.Screen
         name="MaintenanceDashboard"
         component={MaintenanceDashboardScreen}
-        options={{ title: 'Dashboard de Mantenimiento' }}
+        options={{ title: 'General Maintenance' }}
       />
     </Stack.Navigator>
   );
 }
 
 export default function App() {
+  const [blocked, setBlocked] = useState(false);
+  const [deviceId, setDeviceId] = useState(null);
+  const [deviceReady, setDeviceReady] = useState(false);
+
   useEffect(() => {
     checkUpcomingMaintenances();
-    registerDevice(); // ✅ asegurado aquí
+    registerDevice();
   }, []);
-  
-
-  const registerDevice = async () => {
-    try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-  
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-  
-      if (finalStatus !== 'granted') {
-        console.log('❌ Permisos no otorgados');
-        return;
-      }
-  
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        'projectId': Constants.expoConfig?.extra.eas.projectId, 
-      });
-      const token = tokenData.data;
-  
-      const id =
-        Device.osInternalBuildId ||
-        Application.androidId ||
-        (await Application.getIosIdForVendorAsync()) ||
-        Date.now().toString();
-  
-      console.log('📲 Registrando dispositivo:', id, token);
-  
-      await setDoc(doc(db, 'device_tokens', id), {
-        token,
-        deviceId: id,
-        available: true,
-        createdAt: Timestamp.now(),
-      }, { merge: true });
-  
-      console.log('✅ Dispositivo registrado correctamente');
-    } catch (error) {
-      console.log('❌ Error al registrar dispositivo:', error.message);
-    }
-  };
 
   const checkUpcomingMaintenances = async () => {
     const snapshot = await getDocs(collection(db, 'rooms'));
@@ -139,6 +105,82 @@ export default function App() {
       }
     }
   };
+
+  const registerDevice = async () => {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('❌ Permisos no otorgados');
+        return;
+      }
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra.eas.projectId,
+      });
+      const token = tokenData.data;
+
+      const id =
+        Device.osInternalBuildId ||
+        Application.androidId ||
+        (await Application.getIosIdForVendorAsync()) ||
+        Date.now().toString();
+
+      setDeviceId(id);
+
+      const ref = doc(db, 'device_tokens', id);
+      const snapshot = await getDoc(ref);
+
+      let available = true;
+
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        available = data.available !== false;
+        await setDoc(ref, { token, deviceId: id }, { merge: true });
+      } else {
+        await setDoc(ref, {
+          token,
+          deviceId: id,
+          available: true,
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      console.log('📲 Registrado. ¿Disponible?:', available);
+      setBlocked(!available);
+      setDeviceReady(true); // para permitir render después
+
+      // 🔁 Escucha en tiempo real
+      onSnapshot(ref, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const currentlyAvailable = data.available !== false;
+          setBlocked(!currentlyAvailable);
+        }
+      });
+    } catch (error) {
+      console.log('❌ Error al registrar dispositivo:', error.message);
+    }
+  };
+
+  if (!deviceReady) return null;
+
+  if (blocked) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
+          ⛔ Acceso restringido. Hoy no estás disponible para usar la app.
+        </Text>
+        <Button title="Salir" onPress={() => BackHandler.exitApp()} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>

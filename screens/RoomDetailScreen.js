@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 
 export default function RoomDetailScreen({ route, navigation }) {
   const { room } = route.params;
@@ -51,7 +52,9 @@ export default function RoomDetailScreen({ route, navigation }) {
     }
     if (finalStatus !== 'granted') return;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra.eas.projectId,
+    });
     const token = tokenData.data;
     setDeviceToken(token);
 

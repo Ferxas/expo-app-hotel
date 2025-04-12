@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, BackHandler } from 'react-native';
+import {
+  View,
+  Text,
+  BackHandler,
+  LayoutAnimation,
+  StyleSheet,
+  UIManager,
+  Platform,
+  TouchableOpacity,
+} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,12 +26,18 @@ import {
 } from 'firebase/firestore';
 import Constants from 'expo-constants';
 import { db } from './firebaseConfig';
+import { Audio } from 'expo-av';
+import { Provider as PaperProvider, Banner, Button, Surface } from 'react-native-paper';
 
 import RoomListScreen from './screens/RoomListScreen';
 import RoomDetailScreen from './screens/RoomDetailScreen';
 import ReportProblemScreen from './screens/ReportProblemScreen';
 import MaintenanceReminderScreen from './screens/MaintenanceReminderScreen';
 import MaintenanceDashboardScreen from './screens/MaintenanceDashboardScreen';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -38,11 +53,7 @@ Notifications.setNotificationHandler({
 function LimpiezaStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="RoomList"
-        component={RoomListScreen}
-        options={{ title: 'Habitaciones por limpiar' }}
-      />
+      <Stack.Screen name="RoomList" component={RoomListScreen} options={{ title: 'Habitaciones por limpiar' }} />
       <Stack.Screen name="RoomDetail" component={RoomDetailScreen} />
       <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
     </Stack.Navigator>
@@ -52,11 +63,7 @@ function LimpiezaStack() {
 function MantenimientoStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="MaintenanceReminder"
-        component={MaintenanceReminderScreen}
-        options={{ title: 'Mantenimiento de A/C' }}
-      />
+      <Stack.Screen name="MaintenanceReminder" component={MaintenanceReminderScreen} options={{ title: 'A/C' }} />
     </Stack.Navigator>
   );
 }
@@ -64,11 +71,7 @@ function MantenimientoStack() {
 function DashboardStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="MaintenanceDashboard"
-        component={MaintenanceDashboardScreen}
-        options={{ title: 'General Maintenance' }}
-      />
+      <Stack.Screen name="MaintenanceDashboard" component={MaintenanceDashboardScreen} options={{ title: 'General Maintenance' }} />
     </Stack.Navigator>
   );
 }
@@ -77,6 +80,16 @@ export default function App() {
   const [blocked, setBlocked] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [deviceReady, setDeviceReady] = useState(false);
+  const [internalMessage, setInternalMessage] = useState(null);
+
+  const playSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(require('./assets/notification.mp3'));
+      await sound.playAsync();
+    } catch (error) {
+      console.log('🔇 Error reproduciendo sonido:', error.message);
+    }
+  };
 
   useEffect(() => {
     checkUpcomingMaintenances();
@@ -116,22 +129,14 @@ export default function App() {
         finalStatus = status;
       }
 
-      if (finalStatus !== 'granted') {
-        console.log('❌ Permisos no otorgados');
-        return;
-      }
+      if (finalStatus !== 'granted') return;
 
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig?.extra.eas.projectId,
       });
       const token = tokenData.data;
 
-      const id =
-        Device.osInternalBuildId ||
-        Application.androidId ||
-        (await Application.getIosIdForVendorAsync()) ||
-        Date.now().toString();
-
+      const id = Device.osInternalBuildId || Application.androidId || (await Application.getIosIdForVendorAsync()) || Date.now().toString();
       setDeviceId(id);
 
       const ref = doc(db, 'device_tokens', id);
@@ -152,16 +157,47 @@ export default function App() {
         });
       }
 
-      console.log('📲 Registrado. ¿Disponible?:', available);
       setBlocked(!available);
-      setDeviceReady(true); // para permitir render después
+      setDeviceReady(true);
 
-      // 🔁 Escucha en tiempo real
       onSnapshot(ref, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           const currentlyAvailable = data.available !== false;
           setBlocked(!currentlyAvailable);
+        }
+      });
+
+      onSnapshot(ref, async (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const message = data.customMessage;
+
+          if (message?.text && message?.sentAt) {
+            const lastShown = globalThis.lastMessageShown || 0;
+            const sentTime = message.sentAt.seconds || 0;
+
+            if (sentTime > lastShown) {
+              globalThis.lastMessageShown = sentTime;
+
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: '📩 Nuevo mensaje',
+                  body: message.text,
+                },
+                trigger: null,
+              });
+
+              await playSound();
+              LayoutAnimation.easeInEaseOut();
+              setInternalMessage(message.text);
+
+              setTimeout(() => {
+                LayoutAnimation.easeInEaseOut();
+                setInternalMessage(null);
+              }, 10000);
+            }
+          }
         }
       });
     } catch (error) {
@@ -173,22 +209,58 @@ export default function App() {
 
   if (blocked) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <Text style={{ fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
-          ⛔ Acceso restringido. Hoy no estás disponible para usar la app.
-        </Text>
-        <Button title="Salir" onPress={() => BackHandler.exitApp()} />
-      </View>
+      <PaperProvider>
+        <View style={styles.centered}>
+          <Surface style={styles.blockSurface}>
+            <Text style={styles.blockedText}>⛔ Acceso restringido. Hoy no estás disponible para usar la app.</Text>
+            <Button mode="contained" onPress={() => BackHandler.exitApp()}>
+              Salir
+            </Button>
+          </Surface>
+        </View>
+      </PaperProvider>
     );
   }
 
   return (
-    <NavigationContainer>
-      <Tab.Navigator>
-        <Tab.Screen name="Limpieza" component={LimpiezaStack} />
-        <Tab.Screen name="Mantenimiento" component={MantenimientoStack} />
-        <Tab.Screen name="Dashboard" component={DashboardStack} />
-      </Tab.Navigator>
-    </NavigationContainer>
+    <PaperProvider>
+      {internalMessage && (
+        <Banner
+          visible
+          actions={[{ label: 'Cerrar', onPress: () => setInternalMessage(null) }]}
+          icon="message-alert"
+        >
+          {internalMessage}
+        </Banner>
+      )}
+      <NavigationContainer>
+        <Tab.Navigator>
+          <Tab.Screen name="Limpieza 🧹" component={LimpiezaStack} />
+          <Tab.Screen name="A/C 𖣘" component={MantenimientoStack} />
+          <Tab.Screen name="Dashboard 📺" component={DashboardStack} />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </PaperProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#FAFAFA',
+  },
+  blockSurface: {
+    padding: 20,
+    width: '90%',
+    elevation: 4,
+    borderRadius: 12,
+  },
+  blockedText: {
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+});

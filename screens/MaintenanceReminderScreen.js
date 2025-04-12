@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Button, ScrollView, Alert } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Text, Button, Surface, useTheme, Divider, Snackbar } from 'react-native-paper';
 import { collection, onSnapshot, updateDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 export default function MaintenanceReminderScreen() {
   const [rooms, setRooms] = useState([]);
+  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const MAINTENANCE_INTERVAL_DAYS = 76;
+  const theme = useTheme();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'rooms'), (snapshot) => {
@@ -52,50 +55,97 @@ export default function MaintenanceReminderScreen() {
         });
       }
 
-      Alert.alert('✅ Registro guardado');
+      setSnackbar({
+        visible: true,
+        message:
+          action === 'done'
+            ? `✅ Mantenimiento registrado para habitación ${number}`
+            : `⚠️ Mantenimiento omitido en habitación ${number}`,
+      });
     } catch (err) {
-      Alert.alert('Error', err.message);
+      setSnackbar({ visible: true, message: '❌ Error: ' + err.message });
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Mantenimiento de Aire Acondicionado</Text>
+      <Text variant="titleLarge" style={styles.title}>
+        🛠️ Mantenimiento de Aire Acondicionado
+      </Text>
 
       {rooms.map((room, index) => (
-        <View key={index} style={styles.card}>
-          <Text style={styles.room}>Habitación {room.number}</Text>
-          <Text>Último mantenimiento: {room.lastMaintenance ? room.lastMaintenance.toDateString() : 'Ninguno'}</Text>
+        <Surface key={index} style={[styles.card, room.needsMaintenance && styles.danger]}>
+          <Text variant="titleMedium" style={styles.room}>
+            Habitación {room.number}
+          </Text>
 
-          <Text style={{ marginTop: 4 }}>
+          <Text style={{ marginBottom: 4 }}>
+            Último mantenimiento:{' '}
+            {room.lastMaintenance ? room.lastMaintenance.toDateString() : '—'}
+          </Text>
+
+          <Text style={{ marginBottom: 8 }}>
             {room.needsMaintenance
-              ? `⚠️ Mantenimiento vencido por ${-room.daysLeft} días`
+              ? `⚠️ Vencido por ${-room.daysLeft} días`
               : `⏳ Faltan ${room.daysLeft} días`}
           </Text>
 
           {room.needsMaintenance && (
             <>
-              <Button title="Registrar mantenimiento ✅" onPress={() => logMaintenance(room.id, room.number, 'done')} />
-              <View style={{ height: 8 }} />
-              <Button title="Omitir ❌" color="red" onPress={() => logMaintenance(room.id, room.number, 'skipped')} />
+              <Button
+                icon="check"
+                mode="contained"
+                onPress={() => logMaintenance(room.id, room.number, 'done')}
+                style={{ marginBottom: 8 }}
+              >
+                Registrar mantenimiento
+              </Button>
+              <Button
+                icon="close"
+                mode="outlined"
+                onPress={() => logMaintenance(room.id, room.number, 'skipped')}
+                textColor={theme.colors.error}
+              >
+                Omitir
+              </Button>
             </>
           )}
-        </View>
+        </Surface>
       ))}
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+        duration={3000}
+      >
+        {snackbar.message}
+      </Snackbar>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  card: {
-    backgroundColor: '#f9f9f9',
+  container: {
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ccc',
+    backgroundColor: '#FAFAFA',
   },
-  room: { fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
+  title: {
+    marginBottom: 16,
+    fontWeight: 'bold',
+  },
+  card: {
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 16,
+    backgroundColor: 'white',
+    elevation: 3,
+  },
+  danger: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
+  },
+  room: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
 });

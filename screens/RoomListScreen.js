@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
+import { Text, Card, Surface, useTheme } from 'react-native-paper';
 import { db } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export default function RoomListScreen({ navigation }) {
   const [rooms, setRooms] = useState([]);
+  const theme = useTheme();
 
   useEffect(() => {
     const q = query(
@@ -20,49 +22,67 @@ export default function RoomListScreen({ navigation }) {
       setRooms(roomData);
     });
 
-    return () => unsubscribe(); // Limpia el listener al desmontar el componente
+    return () => unsubscribe();
   }, []);
 
-  const renderItem = ({ item }) => {
-    let bgColor = '#eee';
-
-    if (item.state === 'SE') bgColor = '#fff9c4';        // amarillo claro
-    else if (item.state === 'CO') bgColor = '#ffcdd2';   // rojo claro
-    else if (item.state === 'CLEAN') bgColor = '#c8e6c9'; // verde claro
-
-    return (
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: bgColor }]}
-        onPress={() => navigation.navigate('RoomDetail', { room: item })}
-      >
-        <Text style={styles.title}>Room {item.number}</Text>
-        <Text style={styles.state}>Estado: {item.state}</Text>
-      </TouchableOpacity>
-    );
+  const getCardColor = (state) => {
+    if (state === 'SE') return '#fff59d';      // amarillo claro
+    if (state === 'CO') return '#ef9a9a';      // rojo claro
+    if (state === 'CLEAN') return '#a5d6a7';   // verde claro
+    return '#eeeeee';
   };
 
+  const renderItem = ({ item }) => (
+    <Surface
+      style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
+      elevation={2}
+      onTouchEnd={() => navigation.navigate('RoomDetail', { room: item })}
+    >
+      <Text variant="titleMedium" style={styles.title}>
+        🛏️ Habitación {item.number}
+      </Text>
+      <Text style={styles.state}>Estado: {item.state}</Text>
+    </Surface>
+  );
+
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={rooms}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.empty}>No hay habitaciones para limpiar</Text>}
-      />
-    </View>
+    <FlatList
+      data={rooms}
+      keyExtractor={item => item.id}
+      renderItem={renderItem}
+      contentContainerStyle={styles.container}
+      ListEmptyComponent={
+        <Text style={styles.empty}>✅ No hay habitaciones para limpiar</Text>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: {
+    padding: 20,
+    backgroundColor: '#FAFAFA',
+  },
   card: {
     padding: 16,
     marginBottom: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc'
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: '#ccc',
   },
-  title: { fontSize: 18, fontWeight: 'bold' },
-  state: { marginTop: 4 },
-  empty: { textAlign: 'center', marginTop: 20, color: '#888' }
+  title: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  state: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#333',
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 16,
+    color: '#777',
+  },
 });

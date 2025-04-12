@@ -1,12 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, TextInput, StyleSheet, Alert, AppState } from 'react-native';
+import {
+  View,
+  Alert,
+  AppState,
+  StyleSheet,
+  ScrollView,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from 'react-native';
+import { Text, Button, TextInput, Surface, Divider, Switch } from 'react-native-paper';
 import { db } from '../firebaseConfig';
-import { doc, updateDoc, collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
+import {
+  doc,
+  updateDoc,
+  collection,
+  addDoc,
+  Timestamp,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function RoomDetailScreen({ route, navigation }) {
   const { room } = route.params;
@@ -18,7 +41,6 @@ export default function RoomDetailScreen({ route, navigation }) {
   const [totalPausedTime, setTotalPausedTime] = useState(0);
   const [isAvailable, setIsAvailable] = useState(true);
   const [deviceId, setDeviceId] = useState(null);
-  const [deviceToken, setDeviceToken] = useState(null);
   const [hasOngoingCleaning, setHasOngoingCleaning] = useState(false);
   const timerRef = useRef(null);
 
@@ -55,10 +77,12 @@ export default function RoomDetailScreen({ route, navigation }) {
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: Constants.expoConfig?.extra.eas.projectId,
     });
-    const token = tokenData.data;
-    setDeviceToken(token);
+    const id =
+      Device.osInternalBuildId ||
+      Application.androidId ||
+      (await Application.getIosIdForVendorAsync()) ||
+      Date.now().toString();
 
-    const id = Device.osInternalBuildId || Application.androidId || Application.getIosIdForVendorAsync() || Date.now().toString();
     setDeviceId(id);
 
     const q = query(collection(db, 'device_tokens'), where('deviceId', '==', id));
@@ -66,7 +90,7 @@ export default function RoomDetailScreen({ route, navigation }) {
 
     if (snapshot.empty) {
       await addDoc(collection(db, 'device_tokens'), {
-        token,
+        token: tokenData.data,
         deviceId: id,
         active: true,
         createdAt: Timestamp.now(),
@@ -82,6 +106,7 @@ export default function RoomDetailScreen({ route, navigation }) {
     if (!snapshot.empty) {
       const docRef = snapshot.docs[0].ref;
       await updateDoc(docRef, { active: !isAvailable });
+      LayoutAnimation.easeInEaseOut();
       setIsAvailable(!isAvailable);
     }
   };
@@ -146,7 +171,7 @@ export default function RoomDetailScreen({ route, navigation }) {
     });
   };
 
-  const pauseCleaning = async () => {
+  const pauseCleaning = () => {
     clearInterval(timerRef.current);
     setPauseStart(Date.now());
     setIsPaused(true);
@@ -222,73 +247,107 @@ export default function RoomDetailScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Habitación {room.number}</Text>
-      <Text>Estado actual: {room.state}</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Surface style={styles.surface}>
+        <Text variant="titleLarge">🛏️ Habitación {room.number}</Text>
+        <Text variant="bodyMedium" style={styles.status}>Estado actual: {room.state}</Text>
 
-      {hasOngoingCleaning && (
-        <Text style={styles.warning}>🚧 Esta limpieza ya estaba en curso.</Text>
-      )}
+        {hasOngoingCleaning && (
+          <Text style={styles.warning}>🚧 Esta limpieza ya estaba en curso.</Text>
+        )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre del empleado (opcional)"
-        value={employeeName}
-        onChangeText={setEmployeeName}
-      />
+        <Divider style={{ marginVertical: 10 }} />
 
-      <Button
-        title={isAvailable ? '🟢 Disponible para notificaciones' : '🔕 No disponible'}
-        onPress={toggleAvailability}
-        color={isAvailable ? '#4CAF50' : '#9E9E9E'}
-      />
+        <TextInput
+          label="Empleado (opcional)"
+          mode="outlined"
+          value={employeeName}
+          onChangeText={setEmployeeName}
+          style={{ marginBottom: 16 }}
+        />
 
-      {!startTime ? (
-        <Button title="Iniciar limpieza" onPress={startCleaning} />
-      ) : (
-        <>
-          <Text style={styles.timer}>
-            ⏱ Tiempo: {Math.floor(elapsed / 60)} min {elapsed % 60} s
-          </Text>
+        <View style={styles.row}>
+          <Text style={{ marginRight: 8 }}>¿Disponible?</Text>
+          <Switch value={isAvailable} onValueChange={toggleAvailability} />
+        </View>
 
-          {!isPaused ? (
-            <Button title="Pausar temporizador ⏸️" onPress={pauseCleaning} color="#FF9800" />
-          ) : (
-            <Button title="Reanudar temporizador ▶️" onPress={startCleaning} color="#4CAF50" />
-          )}
+        {!startTime ? (
+          <Button mode="contained" onPress={startCleaning} style={styles.button}>
+            Iniciar limpieza
+          </Button>
+        ) : (
+          <>
+            <Text style={styles.timer}>
+              ⏱ Tiempo: {Math.floor(elapsed / 60)} min {elapsed % 60} s
+            </Text>
 
-          <View style={{ height: 10 }} />
-          <Button title="Finalizar limpieza" onPress={stopCleaning} color="#4CAF50" />
-          <View style={{ height: 10 }} />
-          <Button title="Cancelar limpieza ❌" onPress={cancelCleaning} color="#9E9E9E" />
-        </>
-      )}
+            {!isPaused ? (
+              <Button mode="outlined" onPress={pauseCleaning} style={styles.button}>
+                ⏸️ Pausar temporizador
+              </Button>
+            ) : (
+              <Button mode="contained" onPress={startCleaning} style={styles.button}>
+                ▶️ Reanudar temporizador
+              </Button>
+            )}
 
-      <View style={{ height: 10 }} />
-      <Button
-        title="📸 Reportar un problema"
-        onPress={() => navigation.navigate('ReportProblem', { room, employeeName })}
-        color="#f44336"
-      />
-    </View>
+            <Button mode="contained" onPress={stopCleaning} style={[styles.button, { backgroundColor: '#4CAF50' }]}>
+              Finalizar limpieza
+            </Button>
+
+            <Button mode="outlined" onPress={cancelCleaning} style={styles.button}>
+              ❌ Cancelar limpieza
+            </Button>
+          </>
+        )}
+
+        <Divider style={{ marginVertical: 12 }} />
+
+        <Button
+          mode="elevated"
+          onPress={() => navigation.navigate('ReportProblem', { room, employeeName })}
+          style={{ backgroundColor: '#f44336' }}
+          textColor="white"
+        >
+          📸 Reportar un problema
+        </Button>
+      </Surface>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    padding: 10,
-    marginVertical: 12,
+  container: {
+    padding: 16,
+    backgroundColor: '#FAFAFA',
+    flexGrow: 1,
   },
-  timer: { fontSize: 16, marginVertical: 12 },
+  surface: {
+    padding: 20,
+    borderRadius: 12,
+    elevation: 4,
+    backgroundColor: 'white',
+  },
+  button: {
+    marginTop: 10,
+  },
+  timer: {
+    fontSize: 16,
+    marginVertical: 10,
+  },
   warning: {
     fontSize: 14,
     color: 'orange',
     marginBottom: 10,
     fontWeight: 'bold',
+  },
+  status: {
+    marginTop: 4,
+    color: '#555',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
 });

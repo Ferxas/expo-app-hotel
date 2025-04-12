@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Image, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Image, ScrollView } from 'react-native';
+import { Text, Button, TextInput, Surface, ActivityIndicator } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage } from '../firebaseConfig';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -35,12 +36,11 @@ export default function ReportProblemScreen({ route, navigation }) {
 
   const submitReport = async () => {
     if (!description.trim()) {
-      Alert.alert('Descripción requerida');
+      alert('⚠️ Debes escribir una descripción');
       return;
     }
 
     setUploading(true);
-
     let imageUrl = null;
 
     try {
@@ -60,53 +60,82 @@ export default function ReportProblemScreen({ route, navigation }) {
         employeeName: employeeName?.trim() || null,
       });
 
-      Alert.alert('✅ Problema reportado');
+      alert('✅ Problema reportado exitosamente');
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error al enviar', error.message);
+      alert('❌ Error al enviar el reporte: ' + error.message);
     }
 
     setUploading(false);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Reportar problema en habitación {room.number}</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Surface style={styles.surface}>
+        <Text variant="titleLarge" style={{ marginBottom: 8 }}>
+          🧾 Reportar problema en habitación {room.number}
+        </Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Describe el problema"
-        multiline
-        numberOfLines={4}
-        value={description}
-        onChangeText={setDescription}
-      />
+        <TextInput
+          label="Descripción del problema"
+          mode="outlined"
+          multiline
+          numberOfLines={4}
+          value={description}
+          onChangeText={setDescription}
+          style={{ marginBottom: 16 }}
+        />
 
-      {image && (
-        <Image source={{ uri: image }} style={styles.image} />
-      )}
+        {image && (
+          <Image source={{ uri: image }} style={styles.image} />
+        )}
 
-      <View style={styles.buttons}>
-        <Button title="📷 Tomar foto" onPress={takePhoto} />
-        <Button title="🖼️ Elegir imagen" onPress={pickImage} />
-      </View>
+        <View style={styles.buttons}>
+          <Button icon="camera" mode="outlined" onPress={takePhoto} style={{ flex: 1, marginRight: 6 }}>
+            Tomar foto
+          </Button>
+          <Button icon="image" mode="outlined" onPress={pickImage} style={{ flex: 1, marginLeft: 6 }}>
+            Elegir imagen
+          </Button>
+        </View>
 
-      <Button title={uploading ? 'Enviando...' : 'Enviar reporte'} onPress={submitReport} disabled={uploading} />
-    </View>
+        {uploading ? (
+          <ActivityIndicator animating={true} size="large" style={{ marginVertical: 12 }} />
+        ) : (
+          <Button
+            mode="contained"
+            onPress={submitReport}
+            style={{ marginTop: 8 }}
+          >
+            Enviar reporte
+          </Button>
+        )}
+      </Surface>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-    textAlignVertical: 'top'
+  container: {
+    padding: 16,
+    backgroundColor: '#FAFAFA',
+    flexGrow: 1,
   },
-  image: { width: '100%', height: 200, marginBottom: 12, borderRadius: 8 },
-  buttons: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  surface: {
+    padding: 20,
+    elevation: 4,
+    borderRadius: 12,
+    backgroundColor: 'white',
+  },
+  image: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  buttons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
 });

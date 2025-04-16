@@ -77,11 +77,13 @@ function DashboardStack() {
 }
 
 export default function App() {
+  console.log('🚀 App started');
   const [blocked, setBlocked] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
   const [deviceReady, setDeviceReady] = useState(false);
   const [internalMessage, setInternalMessage] = useState(null);
-
+  
+  console.log('🧠 App render: blocked=', blocked, 'deviceReady=', deviceReady);
   const playSound = async () => {
     try {
       const { sound } = await Audio.Sound.createAsync(require('./assets/notification.mp3'));
@@ -132,7 +134,7 @@ export default function App() {
       if (finalStatus !== 'granted') return;
 
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra.eas.projectId,
+        projectId: Constants?.manifest?.extra?.eas?.projectId || "15c04e60-5c12-4cbe-aa7e-a409ec8458a0",
       });
       const token = tokenData.data;
 

@@ -75,7 +75,7 @@ export default function RoomDetailScreen({ route, navigation }) {
     if (finalStatus !== 'granted') return;
 
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: Constants.expoConfig?.extra.eas.projectId,
+      projectId: Constants?.manifest?.extra?.eas?.projectId || "15c04e60-5c12-4cbe-aa7e-a409ec8458a0",
     });
     const id =
       Device.osInternalBuildId ||

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "915065368441",
+    "project_id": "fir-employee-app",
+    "storage_bucket": "fir-employee-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:915065368441:android:3ad63cc02c679522ca09a8",
+        "android_client_info": {
+          "package_name": "com.ferxas.chrishotelappnoauth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjhlYtWTEGmIG-9sJLNByD-qEgYYKFPSM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

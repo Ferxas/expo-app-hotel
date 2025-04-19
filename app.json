@@ -21,7 +21,13 @@
       "expo-notifications"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Esta app necesita acceso a la cámara para tomar fotos de los problemas en las habitaciones.",
+        "NSPhotoLibraryUsageDescription": "Esta app necesita acceso a tus fotos para seleccionar imágenes de problemas.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.ferxas.chrishotelappnoauth"
     },
     "android": {
       "package": "com.ferxas.chrishotelappnoauth",

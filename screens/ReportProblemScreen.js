@@ -24,17 +24,18 @@ export default function ReportProblemScreen({ route, navigation }) {
   };
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.launchCameraAsync();
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  
     if (status !== 'granted') {
-      console.log("Permisos de cámara denegado");
-      alert("Permisos de cámara denegado");
+      alert('Se requiere permiso de cámara para tomar fotos.');
       return;
     }
+  
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       quality: 0.6,
     });
-
+  
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }

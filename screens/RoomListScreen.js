@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
-import { Text, Card, Surface, useTheme } from 'react-native-paper';
+import { Text, Card, Surface, useTheme, TouchableRipple } from 'react-native-paper';
 import { db } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -33,16 +33,22 @@ export default function RoomListScreen({ navigation }) {
   };
 
   const renderItem = ({ item }) => (
-    <Surface
-      style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
-      elevation={2}
-      onTouchEnd={() => navigation.navigate('RoomDetail', { room: item })}
+    <TouchableRipple
+      onPress={() => navigation.navigate('RoomDetail', { room: item })}
+      rippleColor="rgba(0, 0, 0, .1)"
+      borderless={false}
+      style={{ borderRadius: 10, marginBottom: 12 }}
     >
-      <Text variant="titleMedium" style={styles.title}>
-        🛏️ Habitación {item.number}
-      </Text>
-      <Text style={styles.state}>Estado: {item.state}</Text>
-    </Surface>
+      <Surface
+        style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
+        elevation={2}
+      >
+        <Text variant="titleMedium" style={styles.title}>
+          🛏️ Habitación {item.number}
+        </Text>
+        <Text style={styles.state}>Estado: {item.state}</Text>
+      </Surface>
+    </TouchableRipple>
   );
 
   return (
@@ -65,7 +71,6 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 16,
-    marginBottom: 12,
     borderRadius: 10,
     borderWidth: 0.5,
     borderColor: '#ccc',

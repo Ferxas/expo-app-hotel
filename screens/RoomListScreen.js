@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
-  TouchableWithoutFeedback,
+  Pressable,
   View,
+  Platform,
 } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
 import { db } from '../firebaseConfig';
@@ -12,6 +13,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 export default function RoomListScreen({ navigation }) {
   const [rooms, setRooms] = useState([]);
   const theme = useTheme();
+  const [touchStartY, setTouchStartY] = useState(0);
 
   useEffect(() => {
     const q = query(
@@ -38,22 +40,30 @@ export default function RoomListScreen({ navigation }) {
   };
 
   const renderItem = ({ item }) => (
-    <TouchableWithoutFeedback
-      delayPressIn={150}
-      onPress={() => navigation.navigate('RoomDetail', { room: item })}
+    <Pressable
+      onTouchStart={(e) => setTouchStartY(e.nativeEvent.pageY)}
+      onTouchEnd={(e) => {
+        const deltaY = Math.abs(e.nativeEvent.pageY - touchStartY);
+        if (deltaY < 10) {
+          navigation.navigate('RoomDetail', { room: item });
+        }
+      }}
+      android_ripple={{
+        color: 'rgba(0,0,0,0.1)',
+        borderless: false,
+      }}
+      style={{ borderRadius: 10, marginBottom: 12 }}
     >
-      <View style={{ marginBottom: 12 }}>
-        <Surface
-          style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
-          elevation={2}
-        >
-          <Text variant="titleMedium" style={styles.title}>
-            🛏️ Habitación {item.number}
-          </Text>
-          <Text style={styles.state}>Estado: {item.state}</Text>
-        </Surface>
-      </View>
-    </TouchableWithoutFeedback>
+      <Surface
+        style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
+        elevation={2}
+      >
+        <Text variant="titleMedium" style={styles.title}>
+          🛏️ Habitación {item.number}
+        </Text>
+        <Text style={styles.state}>Estado: {item.state}</Text>
+      </Surface>
+    </Pressable>
   );
 
   return (

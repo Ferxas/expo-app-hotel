@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
-import { Text, Card, Surface, useTheme, TouchableRipple } from 'react-native-paper';
+import {
+  FlatList,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import { Text, Surface, useTheme } from 'react-native-paper';
 import { db } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -11,11 +16,11 @@ export default function RoomListScreen({ navigation }) {
   useEffect(() => {
     const q = query(
       collection(db, 'rooms'),
-      where('state', 'in', ['SE', 'CO']) // solo habitaciones que requieren limpieza
+      where('state', 'in', ['SE', 'CO'])
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const roomData = snapshot.docs.map(doc => ({
+      const roomData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
@@ -26,35 +31,35 @@ export default function RoomListScreen({ navigation }) {
   }, []);
 
   const getCardColor = (state) => {
-    if (state === 'SE') return '#fff59d';      // amarillo claro
-    if (state === 'CO') return '#ef9a9a';      // rojo claro
-    if (state === 'CLEAN') return '#a5d6a7';   // verde claro
+    if (state === 'SE') return '#fff59d';
+    if (state === 'CO') return '#ef9a9a';
+    if (state === 'CLEAN') return '#a5d6a7';
     return '#eeeeee';
   };
 
   const renderItem = ({ item }) => (
-    <TouchableRipple
+    <TouchableWithoutFeedback
+      delayPressIn={150}
       onPress={() => navigation.navigate('RoomDetail', { room: item })}
-      rippleColor="rgba(0, 0, 0, .1)"
-      borderless={false}
-      style={{ borderRadius: 10, marginBottom: 12 }}
     >
-      <Surface
-        style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
-        elevation={2}
-      >
-        <Text variant="titleMedium" style={styles.title}>
-          🛏️ Habitación {item.number}
-        </Text>
-        <Text style={styles.state}>Estado: {item.state}</Text>
-      </Surface>
-    </TouchableRipple>
+      <View style={{ marginBottom: 12 }}>
+        <Surface
+          style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
+          elevation={2}
+        >
+          <Text variant="titleMedium" style={styles.title}>
+            🛏️ Habitación {item.number}
+          </Text>
+          <Text style={styles.state}>Estado: {item.state}</Text>
+        </Surface>
+      </View>
+    </TouchableWithoutFeedback>
   );
 
   return (
     <FlatList
       data={rooms}
-      keyExtractor={item => item.id}
+      keyExtractor={(item) => item.id}
       renderItem={renderItem}
       contentContainerStyle={styles.container}
       ListEmptyComponent={

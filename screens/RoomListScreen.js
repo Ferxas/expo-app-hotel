@@ -4,11 +4,15 @@ import {
   StyleSheet,
   Pressable,
   View,
-  Platform,
 } from 'react-native';
-import { Text, Surface, useTheme } from 'react-native-paper';
+import { Text, Surface, useTheme, Badge } from 'react-native-paper';
 import { db } from '../firebaseConfig';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from 'firebase/firestore';
 
 export default function RoomListScreen({ navigation }) {
   const [rooms, setRooms] = useState([]);
@@ -16,10 +20,7 @@ export default function RoomListScreen({ navigation }) {
   const [touchStartY, setTouchStartY] = useState(0);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'rooms'),
-      where('state', 'in', ['SE', 'CO'])
-    );
+    const q = query(collection(db, 'rooms'), where('state', 'in', ['SE', 'CO']));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const roomData = snapshot.docs.map((doc) => ({
@@ -32,11 +33,12 @@ export default function RoomListScreen({ navigation }) {
     return () => unsubscribe();
   }, []);
 
-  const getCardColor = (state) => {
-    if (state === 'SE') return '#fff59d';
-    if (state === 'CO') return '#ef9a9a';
-    if (state === 'CLEAN') return '#a5d6a7';
-    return '#eeeeee';
+  const getCardColor = (room) => {
+    if (room.isBeingCleaned) return '#bbdefb'; // azul claro
+    if (room.state === 'SE') return '#fff59d'; // amarillo
+    if (room.state === 'CO') return '#ef9a9a'; // rojo
+    if (room.state === 'CLEAN') return '#a5d6a7'; // verde
+    return '#eeeeee'; // neutro
   };
 
   const renderItem = ({ item }) => (
@@ -55,12 +57,17 @@ export default function RoomListScreen({ navigation }) {
       style={{ borderRadius: 10, marginBottom: 12 }}
     >
       <Surface
-        style={[styles.card, { backgroundColor: getCardColor(item.state) }]}
+        style={[styles.card, { backgroundColor: getCardColor(item) }]}
         elevation={2}
       >
-        <Text variant="titleMedium" style={styles.title}>
-          🛏️ Habitación {item.number}
-        </Text>
+        <View style={styles.cardHeader}>
+          <Text variant="titleMedium" style={styles.title}>
+            🛏️ Habitación {item.number}
+          </Text>
+          {item.isBeingCleaned && (
+            <Badge style={styles.badge}>En limpieza</Badge>
+          )}
+        </View>
         <Text style={styles.state}>Estado: {item.state}</Text>
       </Surface>
     </Pressable>
@@ -104,5 +111,15 @@ const styles = StyleSheet.create({
     marginTop: 40,
     fontSize: 16,
     color: '#777',
+  },
+  badge: {
+    backgroundColor: '#1976d2',
+    color: 'white',
+    alignSelf: 'center',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

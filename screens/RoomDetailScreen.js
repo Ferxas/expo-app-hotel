@@ -20,6 +20,7 @@ import {
   query,
   where,
   getDocs,
+  onSnapshot,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -42,11 +43,19 @@ export default function RoomDetailScreen({ route, navigation }) {
   const [isAvailable, setIsAvailable] = useState(true);
   const [deviceId, setDeviceId] = useState(null);
   const [hasOngoingCleaning, setHasOngoingCleaning] = useState(false);
+  const [cleaningBy, setCleaningBy] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
     registerDevice();
     loadTimer();
+
+    const unsub = onSnapshot(doc(db, 'rooms', room.id), (docSnap) => {
+      const data = docSnap.data();
+      setCleaningBy(data.cleaningBy || null);
+    });
+
+    return () => unsub();
   }, []);
 
   useEffect(() => {
@@ -75,7 +84,7 @@ export default function RoomDetailScreen({ route, navigation }) {
     if (finalStatus !== 'granted') return;
 
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: Constants?.manifest?.extra?.eas?.projectId || "15c04e60-5c12-4cbe-aa7e-a409ec8458a0",
+      projectId: Constants?.manifest?.extra?.eas?.projectId,
     });
     const id =
       Device.osInternalBuildId ||
@@ -94,6 +103,37 @@ export default function RoomDetailScreen({ route, navigation }) {
         deviceId: id,
         active: true,
         createdAt: Timestamp.now(),
+      });
+    }
+  };
+
+  const notifyOthers = async (roomNumber, cleaner) => {
+    const q = query(collection(db, 'device_tokens'), where('active', '==', true));
+    const snapshot = await getDocs(q);
+
+    const message = {
+      title: '🧹 Limpieza iniciada',
+      body: `La habitación ${roomNumber} está siendo limpiada por ${cleaner}`,
+    };
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      const token = data.token;
+      if (!token) continue;
+
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: token,
+          sound: 'default',
+          title: message.title,
+          body: message.body,
+        }),
       });
     }
   };
@@ -130,6 +170,11 @@ export default function RoomDetailScreen({ route, navigation }) {
   };
 
   const startCleaning = async () => {
+    if (!employeeName.trim()) {
+      Alert.alert('⚠️ Debes ingresar tu nombre antes de comenzar.');
+      return;
+    }
+
     if (startTime && isPaused) {
       const resumedAt = Date.now();
       const pausedDuration = resumedAt - pauseStart;
@@ -161,6 +206,12 @@ export default function RoomDetailScreen({ route, navigation }) {
 
     await AsyncStorage.setItem(`timer-${room.id}`, JSON.stringify({ startTime: newStart, totalPausedTime: 0 }));
 
+    await updateDoc(doc(db, 'rooms', room.id), {
+      cleaningBy: employeeName.trim(),
+    });
+
+    await notifyOthers(room.number, employeeName.trim());
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: `⏳ Limpieza en curso`,
@@ -178,72 +229,68 @@ export default function RoomDetailScreen({ route, navigation }) {
   };
 
   const stopCleaning = () => {
-    Alert.alert(
-      'Finalizar limpieza',
-      '¿Estás seguro de que deseas finalizar el servicio de limpieza?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sí',
-          onPress: async () => {
-            clearInterval(timerRef.current);
-            const end = Date.now();
-            const totalDuration = end - startTime - totalPausedTime;
-            const durationSeconds = Math.floor(totalDuration / 1000);
+    Alert.alert('Finalizar limpieza', '¿Estás seguro de que deseas finalizar el servicio de limpieza?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sí',
+        onPress: async () => {
+          clearInterval(timerRef.current);
+          const end = Date.now();
+          const totalDuration = end - startTime - totalPausedTime;
+          const durationSeconds = Math.floor(totalDuration / 1000);
 
-            try {
-              await addDoc(collection(db, 'cleaning_logs'), {
-                roomNumber: room.number,
-                startedAt: Timestamp.fromDate(new Date(startTime)),
-                endedAt: Timestamp.fromDate(new Date(end)),
-                durationMinutes: Math.ceil(durationSeconds / 60),
-                employeeName: employeeName.trim() || null,
-                deviceId: deviceId || 'unknown',
-              });
+          try {
+            await addDoc(collection(db, 'cleaning_logs'), {
+              roomNumber: room.number,
+              startedAt: Timestamp.fromDate(new Date(startTime)),
+              endedAt: Timestamp.fromDate(new Date(end)),
+              durationMinutes: Math.ceil(durationSeconds / 60),
+              employeeName: employeeName.trim(),
+              deviceId: deviceId || 'unknown',
+            });
 
-              const roomRef = doc(db, 'rooms', room.id);
-              await updateDoc(roomRef, {
-                state: 'CLEAN',
-                lastCleaned: Timestamp.now(),
-              });
+            await updateDoc(doc(db, 'rooms', room.id), {
+              state: 'CLEAN',
+              lastCleaned: Timestamp.now(),
+              cleaningBy: null,
+            });
 
-              await AsyncStorage.removeItem(`timer-${room.id}`);
-              await Notifications.dismissAllNotificationsAsync();
+            await AsyncStorage.removeItem(`timer-${room.id}`);
+            await Notifications.dismissAllNotificationsAsync();
 
-              Alert.alert('✅ Limpieza registrada');
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert('Error al guardar:', error.message);
-            }
-          },
+            Alert.alert('✅ Limpieza registrada');
+            navigation.goBack();
+          } catch (error) {
+            Alert.alert('Error al guardar:', error.message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const cancelCleaning = () => {
-    Alert.alert(
-      'Cancelar limpieza',
-      '¿Seguro que deseas cancelar esta limpieza? No se guardará ningún registro.',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí, cancelar',
-          onPress: async () => {
-            clearInterval(timerRef.current);
-            await AsyncStorage.removeItem(`timer-${room.id}`);
-            await Notifications.dismissAllNotificationsAsync();
-            setStartTime(null);
-            setElapsed(0);
-            setIsPaused(false);
-            setPauseStart(null);
-            setTotalPausedTime(0);
-            setHasOngoingCleaning(false);
-            Alert.alert('⛔ Limpieza cancelada');
-          },
+    Alert.alert('Cancelar limpieza', '¿Seguro que deseas cancelar esta limpieza?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Sí, cancelar',
+        onPress: async () => {
+          clearInterval(timerRef.current);
+          await AsyncStorage.removeItem(`timer-${room.id}`);
+          await Notifications.dismissAllNotificationsAsync();
+          await updateDoc(doc(db, 'rooms', room.id), {
+            cleaningBy: null,
+          });
+
+          setStartTime(null);
+          setElapsed(0);
+          setIsPaused(false);
+          setPauseStart(null);
+          setTotalPausedTime(0);
+          setHasOngoingCleaning(false);
+          Alert.alert('⛔ Limpieza cancelada');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -252,14 +299,14 @@ export default function RoomDetailScreen({ route, navigation }) {
         <Text variant="titleLarge">🛏️ Habitación {room.number}</Text>
         <Text variant="bodyMedium" style={styles.status}>Estado actual: {room.state}</Text>
 
-        {hasOngoingCleaning && (
-          <Text style={styles.warning}>🚧 Esta limpieza ya estaba en curso.</Text>
+        {cleaningBy && (
+          <Text style={styles.warning}>🔄 Actualmente está siendo limpiada por: {cleaningBy}</Text>
         )}
 
         <Divider style={{ marginVertical: 10 }} />
 
         <TextInput
-          label="Empleado (opcional)"
+          label="Empleado (obligatorio)"
           mode="outlined"
           value={employeeName}
           onChangeText={setEmployeeName}

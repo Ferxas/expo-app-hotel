@@ -1,19 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { Text, Button, Surface, useTheme, Divider, Snackbar } from 'react-native-paper';
+import { Text, Button, Surface, useTheme, Divider, Snackbar, Chip } from 'react-native-paper';
 import { collection, onSnapshot, updateDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
+const MAINTENANCE_INTERVAL_DAYS = 76;
+
 export default function MaintenanceReminderScreen() {
-  const [rooms, setRooms] = useState([]);
+  const [spaces, setSpaces] = useState([]);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
-  const MAINTENANCE_INTERVAL_DAYS = 76;
   const theme = useTheme();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'rooms'), (snapshot) => {
       const now = new Date();
-      const updatedRooms = snapshot.docs.map((docSnap) => {
+      const updated = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         const last = data.lastMaintenance?.seconds
           ? new Date(data.lastMaintenance.seconds * 1000)
@@ -23,34 +24,33 @@ export default function MaintenanceReminderScreen() {
           ? Math.floor((now - last) / (1000 * 60 * 60 * 24))
           : MAINTENANCE_INTERVAL_DAYS + 1;
 
-        const daysLeft = MAINTENANCE_INTERVAL_DAYS - diffDays;
-        const needsMaintenance = diffDays >= MAINTENANCE_INTERVAL_DAYS;
-
         return {
           id: docSnap.id,
           number: data.number,
+          type: data.type || 'room', // room, office, laundry, etc.
           lastMaintenance: last,
-          needsMaintenance,
-          daysLeft,
+          daysLeft: MAINTENANCE_INTERVAL_DAYS - diffDays,
+          needsMaintenance: diffDays >= MAINTENANCE_INTERVAL_DAYS,
         };
       });
 
-      setRooms(updatedRooms);
+      setSpaces(updated);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const logMaintenance = async (roomId, number, action) => {
+  const logMaintenance = async (spaceId, number, type, action) => {
     try {
       await addDoc(collection(db, 'maintenance_logs'), {
-        roomNumber: number,
+        targetNumber: number,
+        targetType: type,
         action,
         date: Timestamp.now(),
       });
 
       if (action === 'done') {
-        await updateDoc(doc(db, 'rooms', roomId), {
+        await updateDoc(doc(db, 'rooms', spaceId), {
           lastMaintenance: Timestamp.now(),
         });
       }
@@ -59,43 +59,60 @@ export default function MaintenanceReminderScreen() {
         visible: true,
         message:
           action === 'done'
-            ? `✅ Mantenimiento registrado para habitación ${number}`
-            : `⚠️ Mantenimiento omitido en habitación ${number}`,
+            ? `✅ Mantenimiento registrado para ${type} ${number}`
+            : `⚠️ Mantenimiento omitido en ${type} ${number}`,
       });
     } catch (err) {
       setSnackbar({ visible: true, message: '❌ Error: ' + err.message });
     }
   };
 
+  const getLabel = (type) => {
+    switch (type) {
+      case 'office': return '🏢 Oficina';
+      case 'laundry': return '🧺 Laundry';
+      case 'room':
+      default:
+        return '🛏️ Habitación';
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text variant="titleLarge" style={styles.title}>
-        🛠️ Mantenimiento de Aire Acondicionado
-      </Text>
+      <Text variant="titleLarge" style={styles.title}>🛠️ Mantenimiento Preventivo</Text>
 
-      {rooms.map((room, index) => (
-        <Surface key={index} style={[styles.card, room.needsMaintenance && styles.danger]}>
-          <Text variant="titleMedium" style={styles.room}>
-            Habitación {room.number}
+      {spaces.map((space) => (
+        <Surface
+          key={space.id}
+          style={[
+            styles.card,
+            space.needsMaintenance && styles.danger,
+          ]}
+        >
+          <Text variant="titleMedium" style={styles.label}>
+            {getLabel(space.type)} {space.number}
           </Text>
 
-          <Text style={{ marginBottom: 4 }}>
-            Último mantenimiento:{' '}
-            {room.lastMaintenance ? room.lastMaintenance.toDateString() : '—'}
+          <Chip style={{ alignSelf: 'flex-start', marginBottom: 6 }} mode="outlined">
+            Tipo: {space.type.toUpperCase()}
+          </Chip>
+
+          <Text>
+            Último mantenimiento: {space.lastMaintenance ? space.lastMaintenance.toDateString() : '—'}
           </Text>
 
-          <Text style={{ marginBottom: 8 }}>
-            {room.needsMaintenance
-              ? `⚠️ Vencido por ${-room.daysLeft} días`
-              : `⏳ Faltan ${room.daysLeft} días`}
+          <Text style={{ marginBottom: 10 }}>
+            {space.needsMaintenance
+              ? `⚠️ Vencido por ${-space.daysLeft} días`
+              : `⏳ Faltan ${space.daysLeft} días`}
           </Text>
 
-          {room.needsMaintenance && (
+          {space.needsMaintenance && (
             <>
               <Button
                 icon="check"
                 mode="contained"
-                onPress={() => logMaintenance(room.id, room.number, 'done')}
+                onPress={() => logMaintenance(space.id, space.number, space.type, 'done')}
                 style={{ marginBottom: 8 }}
               >
                 Registrar mantenimiento
@@ -103,7 +120,7 @@ export default function MaintenanceReminderScreen() {
               <Button
                 icon="close"
                 mode="outlined"
-                onPress={() => logMaintenance(room.id, room.number, 'skipped')}
+                onPress={() => logMaintenance(space.id, space.number, space.type, 'skipped')}
                 textColor={theme.colors.error}
               >
                 Omitir
@@ -144,8 +161,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#f44336',
   },
-  room: {
+  label: {
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
   },
 });

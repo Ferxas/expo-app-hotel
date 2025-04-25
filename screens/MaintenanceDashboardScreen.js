@@ -30,26 +30,35 @@ export default function MaintenanceDashboardScreen() {
     }
   };
 
-  const getColor = (description) => {
-    const desc = description?.toLowerCase() || '';
-    if (desc.includes('urgente') || desc.includes('fuga') || desc.includes('inundación') || desc.includes('enchufe'))
-      return '#ffcdd2'; // rojo claro
-    if (desc.includes('falla') || desc.includes('no funciona'))
-      return '#fff9c4'; // amarillo claro
-    if (desc.includes('pintura') || desc.includes('estético'))
-      return '#eeeeee'; // gris claro
-    return '#f5f5f5'; // neutro
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'urgente':
+        return '#ffcdd2';
+      case 'medio':
+        return '#fff9c4';
+      case 'bajo':
+        return '#eeeeee';
+      default:
+        return '#f5f5f5';
+    }
   };
 
   const renderItem = ({ item }) => {
     if (item.resolved) return null;
 
+    const isGeneral = item.isGeneralReport;
+    const locationLabel = isGeneral
+      ? `🌐 Ubicación: ${item.generalLocation || '—'}`
+      : `🛏️ Habitación ${item.roomNumber}`;
+
     return (
-      <Surface style={[styles.card, { backgroundColor: getColor(item.description) }]}>
+      <Surface style={[styles.card, { backgroundColor: getPriorityColor(item.priority) }]}>
         <Text variant="titleMedium" style={styles.room}>
-          Habitación {item.roomNumber}
+          {locationLabel}
         </Text>
+
         <Text style={styles.desc}>{item.description || 'Sin descripción'}</Text>
+        <Text style={styles.priority}>Prioridad: {item.priority || '—'}</Text>
 
         {item.imageUrl && (
           <Image source={{ uri: item.imageUrl }} style={styles.img} />
@@ -105,9 +114,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   desc: {
-    marginBottom: 10,
+    marginBottom: 8,
     fontSize: 14,
     color: '#333',
+  },
+  priority: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginBottom: 10,
+    color: '#444',
   },
   img: {
     width: '100%',

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "915065368441",
-    "project_id": "fir-employee-app",
-    "storage_bucket": "fir-employee-app.firebasestorage.app"
+    "project_number": "638190803008",
+    "project_id": "oasishotelapp-33035",
+    "storage_bucket": "oasishotelapp-33035.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:915065368441:android:3ad63cc02c679522ca09a8",
+        "mobilesdk_app_id": "1:638190803008:android:7da030fb6f14310e61e7a5",
         "android_client_info": {
           "package_name": "com.ferxas.chrishotelappnoauth"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAjhlYtWTEGmIG-9sJLNByD-qEgYYKFPSM"
+          "current_key": "AIzaSyAyj0EGD-K9fgR6MapNMV519pEd5KQtKVM"
         }
       ],
       "services": {

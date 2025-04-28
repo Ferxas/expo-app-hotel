@@ -3,12 +3,12 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBPpNDyOLZmB7DclJMywtW4rCh_SJiUTRo",
-  authDomain: "fir-employee-app.firebaseapp.com",
-  projectId: "fir-employee-app",
-  storageBucket: "fir-employee-app.appspot.com",
-  messagingSenderId: "915065368441",
-  appId: "1:915065368441:web:8eb124c309c565cfca09a8"
+  apiKey: "AIzaSyDolwmn4muWt3QH3YYKsrOaXx5mX2yScxU",
+  authDomain: "oasishotelapp-33035.firebaseapp.com",
+  projectId: "oasishotelapp-33035",
+  storageBucket: "oasishotelapp-33035.firebasestorage.app",
+  messagingSenderId: "638190803008",
+  appId: "1:638190803008:web:d2fb6ff17c06f66061e7a5"
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];

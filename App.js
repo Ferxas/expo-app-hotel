@@ -239,7 +239,7 @@ export default function App() {
         <Tab.Navigator>
           <Tab.Screen name="Limpieza 🧹" component={LimpiezaStack} />
           <Tab.Screen name="A/C 𖣘" component={MantenimientoStack} />
-          <Tab.Screen name="Maintenance 📺" component={DashboardStack} />
+          <Tab.Screen name="Maintenance 🔧" component={DashboardStack} />
         </Tab.Navigator>
       </NavigationContainer>
     </PaperProvider>

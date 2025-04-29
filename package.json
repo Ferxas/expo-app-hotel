@@ -22,6 +22,7 @@
     "expo-device": "~7.0.3",
     "expo-image-picker": "~16.0.6",
     "expo-media-library": "~17.0.6",
+    "expo-modules-autolinking": "^2.0.8",
     "expo-notifications": "~0.29.14",
     "expo-status-bar": "~2.0.1",
     "expo-system-ui": "~4.0.9",
